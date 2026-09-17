@@ -188,7 +188,8 @@ class Parser:
 
     def parse_parameter_list(self) -> list[Parameter]:
         parameters = [self.parse_parameter()]
-        while self.match(TokenKind.COMMA):
+        while not self.check(TokenKind.RIGHT_PAREN):
+            self.expect(TokenKind.COMMA)
             parameters.append(self.parse_parameter())
         return parameters
 
@@ -296,7 +297,8 @@ class Parser:
         start = self.expect(TokenKind.KW_PRINT)
         self.expect(TokenKind.LEFT_PAREN)
         items = [self.parse_print_item()]
-        while self.match(TokenKind.COMMA):
+        while not self.check(TokenKind.RIGHT_PAREN):
+            self.expect(TokenKind.COMMA)
             items.append(self.parse_print_item())
         self.expect(TokenKind.RIGHT_PAREN)
         end = self.expect(TokenKind.SEMICOLON)
@@ -459,6 +461,7 @@ class Parser:
         if self.check(TokenKind.RIGHT_PAREN):
             return []
         arguments = [self.parse_expression()]
-        while self.match(TokenKind.COMMA):
+        while not self.check(TokenKind.RIGHT_PAREN):
+            self.expect(TokenKind.COMMA)
             arguments.append(self.parse_expression())
         return arguments
