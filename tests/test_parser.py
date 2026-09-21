@@ -18,12 +18,15 @@ from ast_nodes import (  # noqa: E402
     BinaryExpr,
     BinaryOperator,
     Block,
+    BoolLiteral,
     CallExpr,
     CallStmt,
     IntLiteral,
     SourceSpan,
     StringLiteral,
     TypeName,
+    UnaryExpr,
+    UnaryOperator,
     VarDecl,
     ast_to_dict,
 )
@@ -78,6 +81,58 @@ def test_precedencia_e_associatividade_a_esquerda():
     assert expression.operator is BinaryOperator.SUBTRACT
     assert expression.left.operator is BinaryOperator.SUBTRACT
     assert expression.left.right.operator is BinaryOperator.MULTIPLY
+
+
+def test_operadores_aritmeticos_e_agrupamento():
+    parser = Parser(Lexer("(10 + 2) * 3 / 4 % 2 - 1").scan())
+    expression = parser.parse_expression()
+    assert parser.check(TokenKind.EOF)
+    assert expression.operator is BinaryOperator.SUBTRACT
+    remainder = expression.left
+    assert remainder.operator is BinaryOperator.REMAINDER
+    division = remainder.left
+    assert division.operator is BinaryOperator.DIVIDE
+    multiplication = division.left
+    assert multiplication.operator is BinaryOperator.MULTIPLY
+    assert multiplication.left.operator is BinaryOperator.ADD
+    assert multiplication.left.span == SourceSpan(1, 1, 1, 9)
+    assert expression.span == SourceSpan(1, 1, 1, 25)
+
+
+def test_unarios_aninhados_tem_precedencia_sobre_multiplicacao():
+    expression = Parser(Lexer("!-x * 2").scan()).parse_expression()
+    assert expression.operator is BinaryOperator.MULTIPLY
+    unary = expression.left
+    assert isinstance(unary, UnaryExpr)
+    assert unary.operator is UnaryOperator.NOT
+    assert unary.operand.operator is UnaryOperator.NEGATE
+    assert unary.operand.operand.name == "x"
+    assert unary.span == SourceSpan(1, 1, 1, 4)
+
+
+def test_chamadas_aninhadas_argumentos_e_literais():
+    expression = Parser(Lexer("f(g(), 1 + 2, true, false)").scan()).parse_expression()
+    assert isinstance(expression, CallExpr)
+    assert expression.name == "f"
+    nested, addition, true_literal, false_literal = expression.arguments
+    assert isinstance(nested, CallExpr)
+    assert nested.name == "g"
+    assert nested.arguments == []
+    assert nested.span == SourceSpan(1, 3, 1, 6)
+    assert addition.operator is BinaryOperator.ADD
+    assert isinstance(true_literal, BoolLiteral)
+    assert true_literal.value is True
+    assert isinstance(false_literal, BoolLiteral)
+    assert false_literal.value is False
+
+
+@pytest.mark.parametrize(
+    "expression",
+    ["1 +", "2 *", "!", "-", "()", "(1", "f(,1)", "f(1,)", 'f("texto")'],
+)
+def test_expressoes_incompletas_e_argumentos_invalidos(expression: str):
+    with pytest.raises(ParserError):
+        parse(f"void main() {{ print({expression}); }}")
 
 
 def test_controle_de_fluxo_e_bloco_aninhado():
